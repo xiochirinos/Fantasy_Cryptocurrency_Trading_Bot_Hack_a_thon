@@ -1,0 +1,205 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+install.packages("tidyquant")
+```
+
+```{r}
+install.packages("hrbrthemes")
+```
+
+
+
+```{r}
+library(tidyverse)
+library(gapminder)
+library(socviz)
+library(ggplot2)
+library(gganimate)
+library(gifski)
+library(png)
+library(lubridate)
+library(tidyquant)
+library(hrbrthemes)
+```
+
+```{r}
+ts_data_tbl <- read.csv("Crypto_Hackathon_aRmy.csv")
+ts_data_tbl
+```
+
+
+```{r}
+ts_data_tbl <- ts_data_tbl %>% 
+    mutate(
+        Date = date %>% mdy_hm(),
+        # Day = Date %>% ymd(), 
+        Hour_12 = Date %>% hour(), 
+        Minute = Date %>% minute()
+    ) %>% 
+    mutate(
+        GainLoss = total - lag(x = total, n = 1), 
+        Flag = case_when(
+            GainLoss > 0 ~ "Gain", 
+            GainLoss == 0 ~ "Neither", 
+            GainLoss < 0 ~ "Loss"
+        ), 
+        Average30Mins = zoo::rollmean(x = total, k = 6, align = "right", fill = NA)
+    ) %>% ungroup()
+ts_data_tbl
+```
+
+
+```{r}
+# First six Hours
+ts_data_tbl %>%
+    ggplot(mapping = aes(x = Date, y = total)) +
+    geom_line(size = 1.5, color = "blue") +
+    # geom_line(mapping = aes(y = Average30Mins), size = 1, color = "darkred") +
+    # geom_smooth(span = 0.4) +
+    scale_x_datetime(limits = as.POSIXct(c("2021-03-27 12:00:00", "2021-03-27 18:00:00"))) +
+    # theme_minimal()
+    theme_bw() +
+    theme(axis.text.x = element_text(face = "bold", size = 14)) +
+    theme(axis.text.y = element_text(face = "bold", size = 10)) +
+    transition_reveal(Date)+
+    labs(title = "Cashflow during the Crypto Hackathon",
+         subtitle = "Team: aRmy",
+         x = "Hours",
+         y = "Cash",
+         caption = "Source: Crypto_Hackathon_aRmy.csv")
+```
+
+
+```{r}
+ts_data_tbl %>% 
+    ggplot(mapping = aes(x = Date, y = total)) + 
+    geom_line(size = 1.5) + 
+    scale_x_datetime(limits = as.POSIXct(c("2021-03-27 18:00:00", "2021-03-28 00:00:00"))) + 
+    theme_tq()
+```
+
+
+```{r}
+ts_data_tbl %>% 
+    ggplot(mapping = aes(x = Date, y = total)) + 
+    geom_line(size = 1.5) + 
+    scale_x_datetime(limits = as.POSIXct(c("2021-03-28 00:00:00", "2021-03-28 06:00:00"))) + 
+    theme_tq()
+```
+
+```{r}
+#USING
+ts_data_tbl %>% 
+    ggplot(mapping = aes(x = Date, y = total)) + 
+    # geom_line() + 
+    geom_line(mapping = aes(y = Average30Mins),color = "blue") +
+    theme_bw() +
+    theme(axis.text.x = element_text(face = "bold", size = 10, angle = 90)) +
+    theme(axis.text.y = element_text(face = "bold", size = 10)) +
+    transition_reveal(Date)+
+    labs(title = "Cashflow during the Crypto Hackathon",
+         subtitle = "Team: aRmy",
+         x = "Hours",
+         y = "Cash",
+         caption = "Source: Crypto_Hackathon_aRmy.csv")
+```
+
+
+```{r}
+ts_data_tbl %>% 
+    ggplot(mapping = aes(x = Date, y = total)) + 
+    geom_line() +
+    theme_bw() 
+    #transition_reveal(Date)
+```
+
+
+```{r}
+#USING
+ts_data_tbl %>% 
+    ggplot(mapping = aes(x = Date, y = GainLoss)) + 
+    geom_line(color = "blue") +
+    theme_bw() +
+    theme(axis.text.x = element_text(face = "bold", size = 10, angle = 90)) +
+    theme(axis.text.y = element_text(face = "bold", size = 10)) +
+    transition_reveal(Date)+
+    labs(title = "Crypto Hackathon: Gain and Losses",
+         subtitle = "Team: aRmy",
+         x = "Hours",
+         y = "Cash",
+         caption = "Source: Crypto_Hackathon_aRmy.csv")
+```
+
+
+```{r}
+ts_data_tbl %>% 
+    ggplot(mapping = aes(x = Date, y = GainLoss)) + 
+    geom_col() 
+    #transition_reveal(Date)
+```
+
+
+
+```{r}
+#USING
+ts_data_tbl %>% 
+    group_by(Flag) %>% 
+    summarise(
+        Count = n()
+    ) %>% 
+    filter(! is.na(Flag)) %>% 
+    ungroup() %>% 
+    ggplot(mapping = aes(x = Flag, y = Count, fill = Flag)) + 
+    geom_col() +
+    theme_bw() +
+    theme(axis.text.x = element_text(face = "bold", size = 10)) +
+    theme(axis.text.y = element_text(face = "bold", size = 10)) +
+    transition_states(
+    Count,
+    transition_length = 2,
+    state_length = 2) +
+    labs(title = "Crypto Hackathon: Gain vs Losses",
+         subtitle = "Team: aRmy",
+         x = NULL,
+         y = "Total amount",
+         caption = "Source: Crypto_Hackathon_aRmy.csv") 
+
+#animate(my.animation, height = 800, width =800)
+#anim_save("Crypto Hackathon: Gain vs Losses.gif")
+```
+
+
+```{r}
+#USING
+ts_data_tbl %>% 
+    group_by(Flag, Hour_12) %>% 
+    summarise(
+        AvgGainLoss = mean(GainLoss)
+    ) %>% 
+    filter(! is.na(Flag)) %>% 
+    filter(Flag != "Neither") %>% 
+    ungroup() %>% 
+    ggplot(mapping = aes(x = Flag, y = AvgGainLoss, fill = Flag)) + 
+    geom_col() +
+    theme_bw() +
+    theme(axis.text.x = element_text(face = "bold", size = 10)) +
+    theme(axis.text.y = element_text(face = "bold", size = 10)) +
+    transition_states(
+    Hour_12,
+    transition_length = 1,
+    state_length = 2) +
+    labs(title = "Crypto Hackathon: Avg Gain vs Avg Losses",
+         subtitle = "Team: aRmy",
+         x = NULL,
+         y = "Total amount",
+         caption = "Source: Crypto_Hackathon_aRmy.csv")
+```
+
+
+
+
+
